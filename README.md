@@ -95,6 +95,19 @@ gcloud iam service-accounts keys create credential.json `
 # credential生成設定用のsecret作成
 kubectl create secret generic wordpress-sql-proxy --from-file=credential.json
 
+pubsub-publisher-secret
+gcloud iam service-accounts create pubsub-publisher-secret `
+--display-name="PubSub Publisher"
+# ロールの割り当て
+gcloud projects add-iam-policy-binding $project_id `
+--member=serviceAccount:pubsub-publisher-secret@$project_id.iam.gserviceaccount.com `
+--role=roles/run.admin
+gcloud projects add-iam-policy-binding $project_id `
+--member=serviceAccount:pubsub-publisher-secret@$project_id.iam.gserviceaccount.com `
+--role=roles/iam.serviceAccountKeyAdmin
+
+
+
 ```
 
 <br>
@@ -131,6 +144,33 @@ gcloud compute disks create web-volume --zone=asia-northeast1-a --size=10
 
 <br>
 
+### GKEによるCD
+```
+# クラスタ作成
+gcloud container clusters create gke-cluster `
+--num-nodes=3 `
+--zone=asia-northeast1-a `
+--enable-stackdriver-kubernetes `
+--cluster-version=latest `
+--preemptible
+
+# クラスタの確認
+kubectl config get-contexts
+
+# デプロイ
+gcloud builds submit --config .\cloudbuild.yaml
+
+```
+
+# クラスタ作成
+gcloud container clusters create cloud-runner `
+--addons 'HttpLoadBalancing,CloudRun' `
+--enable-stackdriver-kubernetes `
+--zone asia-northeast1-a `
+--preemptible
+
+# クラスタの確認
+kubectl config get-contexts
 
 <br>
 

@@ -1,0 +1,67 @@
+steps:
+  # イメージのビルド
+  - id: "Build Image"
+    name: "gcr.io/cloud-builders/docker"
+    args: ["build", "-t", "${_GCR_REGION}/$PROJECT_ID/${_GCR_IMAGE_NAME}:${_GCR_TAG}", "."]
+  # GCRへプッシュ
+  - id: "Push Image to GCR"
+    name: "gcr.io/cloud-builders/docker"
+    args: ["push", "${_GCR_REGION}/$PROJECT_ID/${_GCR_IMAGE_NAME}"]
+  # マニフェスト内の変数書き換えYOUR_PROJECT_ID
+  - id: "Replace PROJECT_ID in manifest"
+    name: "alpine"
+    entrypoint: "ash"
+    args:
+      - "-c"
+      - |
+        sed -i -e "s/YOUR_PROJECT_ID/$PROJECT_ID/g" kubernetes/pubsub-publisher.yaml
+  # マニフェスト内の変数書き換えPUBSUB_TOPIC_NAME
+  - id: "Replace PUBSUB_TOPIC"
+    name: "alpine"
+    entrypoint: ash
+    args:
+      - "-c"
+      - |
+        sed -i -e "s/PUBSUB_TOPIC_NAME/${_PUBSUB_TOPIC_NAME}/g" kubernetes/pubsub-publisher.yaml
+  # サービスアカウントの鍵ファイル作成
+  - id: "Create credential"
+    name: "gcr.io/cloud-builders/gcloud"
+    entrypoint: bash
+    args: ["-c", "gcloud iam service-accounts keys create credential.json --iam-account=pubsub-publisher-secret@$PROJECT_ID.iam.gserviceaccount.com --key-file-type=json"]
+    env:
+      - "CLOUDSDK_COMPUTE_ZONE=asia-northeast1-a"
+      - "CLOUDSDK_CONTAINER_CLUSTER=gke-cluster"
+  # Secretリソースの更新
+  - id: "Update Secret"
+    name: "gcr.io/cloud-builders/kubectl"
+    entrypoint: bash
+    args: ["-c", "kubectl create secret generic pubsub-publisher-secret --from-file=credential.json"]
+    env:
+      - "CLOUDSDK_COMPUTE_ZONE=asia-northeast1-a"
+      - "CLOUDSDK_CONTAINER_CLUSTER=gke-cluster"
+
+  # Podの再作成
+  # 古いサービスアカウント鍵
+  # デプロイ GKE
+  - id: "Deploy"
+    name: "gcr.io/cloud-builders/kubectl"
+    args: ["apply", "-f", "kubernetes/pubsub-publisher.yaml"]
+    env:
+      - "CLOUDSDK_COMPUTE_ZONE=${_REGION}"
+      - "CLOUDSDK_CONTAINER_CLUSTER=gke-cluster"
+  # # デプロイ Cloud Run
+  # - name: 'gcr.io/cloud-builders/gcloud'
+  #   entrypoint: gcloud
+  #   args: ['run', 'deploy', '$PROJECT_ID', '--region', 'asia-northeast1', '--image', '[GCRイメージ名]', '--port', '8000', '--platform', 'managed']
+
+substitutions:
+  _REGION: asia-northeast1-a
+  # # GCR region name to push image
+  _GCR_REGION: asia.gcr.io
+  # # Project ID
+  # _GCR_PROJECT: $PROJECT_ID
+  # # Image name
+  _GCR_IMAGE_NAME: pubsub-publisher
+  # # Image tag
+  _GCR_TAG: latest
+  _PUBSUB_TOPIC_NAME: sample-topic

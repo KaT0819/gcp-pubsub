@@ -1,51 +1,42 @@
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: "pubsub-publisher"
-  namespace: default
-  labels:
-    app: web
+  name: pubsub-publisher
 spec:
-  containers:
-    - name: pubsub-publisher
-      image: asia.gcr.io/work-999999/pubsub-publisher
-      resources:
-        limits:
-          cpu: 200m
-          memory: 500Mi
-        requests:
-          cpu: 100m
-          memory: 200Mi
-      env:
-        - name: PROJECT_ID
-          value: work-999999
-        - name: PUBSUB_TOPIC
-          value: sample-topic
-        - name: GOOGLE_APPLICATION_CREDENTIALS
-          value: /home/root/credential.json
-      ports:
+  selector:
+    matchLabels:
+      app: pubsub-publisher
+  template:
+    metadata:
+      labels:
+        app: pubsub-publisher
+    spec:
+      containers:
+      - name: pubsub-publisher
+        image: gcr.io/YOUR_PROJECT_ID/pubsub-publisher
+        resources:
+          requests:
+            memory: 1Gi
+            cpu: 500m
+          limits:
+            memory: 2Gi
+            cpu: 1000m
+        ports:
         - containerPort: 80
-          name: http
-      volumeMounts:
-        - mountPath: /home/root
-          name: credential
-  volumes:
-    - name: credential
-      secret:
-        secretName: pubsub-credential
-
+        env:
+          - name: PROJECT_ID
+            value: YOUR_PROJECT_ID
+          - name: PUBSUB_TOPIC
+            value: PUBSUB_TOPIC_NAME
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: pubsub-publisher
-  namespace: default
 spec:
+  type: NodePort
   selector:
-    app: web
-  type: LoadBalancer
+    app: pubsub-publisher
   ports:
-    - name: pubsub-publisher
-      protocol: TCP
-      port: 80
-      targetPort: 80
+  - port: 80
+    targetPort: 80
